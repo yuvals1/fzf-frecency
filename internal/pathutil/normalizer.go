@@ -31,32 +31,40 @@ func NewPathNormalizer() (*PathNormalizer, error) {
     }, nil
 }
 
-// NormalizePath converts a path to be relative to the current directory
-func (pn *PathNormalizer) NormalizePath(path string) (string, error) {
-    path = filepath.Clean(path)
+// ToStoragePath converts a path to absolute format for storage
+func (pn *PathNormalizer) ToStoragePath(path string) (string, error) {
+    // Clean and trim the path
+    path = strings.TrimSpace(filepath.Clean(path))
     
-    if !filepath.IsAbs(path) && strings.HasPrefix(path, "..") {
-        return path, nil
+    // If it's already absolute, just clean it
+    if filepath.IsAbs(path) {
+        return filepath.Clean(path), nil
     }
     
-    absPath := path
-    if !filepath.IsAbs(path) {
-        absPath = filepath.Join(pn.currentDir, path)
+    // Convert relative path to absolute using current directory
+    return filepath.Abs(filepath.Join(pn.currentDir, path))
+}
+
+// ToDisplayPath converts a storage path to a display format
+func (pn *PathNormalizer) ToDisplayPath(storagePath string) (string, error) {
+    // Clean the storage path
+    storagePath = filepath.Clean(storagePath)
+    
+    // Try to make it relative to current directory first
+    if rel, err := filepath.Rel(pn.currentDir, storagePath); err == nil && !strings.HasPrefix(rel, "..") {
+        return rel, nil
     }
     
-    relToCurrent, err := filepath.Rel(pn.currentDir, absPath)
-    if err == nil && !strings.HasPrefix(relToCurrent, "..") {
-        return relToCurrent, nil
-    }
-    
-    if strings.HasPrefix(absPath, pn.homeDir) {
-        relToHome, err := filepath.Rel(pn.homeDir, absPath)
+    // If it's under home directory, use ~ notation
+    if strings.HasPrefix(storagePath, pn.homeDir) {
+        rel, err := filepath.Rel(pn.homeDir, storagePath)
         if err == nil {
-            return relToHome, nil
+            return "~/" + rel, nil
         }
     }
     
-    return absPath, nil
+    // If all else fails, return the absolute path
+    return storagePath, nil
 }
 
 // GetCurrentDir returns the current working directory
@@ -67,4 +75,19 @@ func (pn *PathNormalizer) GetCurrentDir() string {
 // GetHomeDir returns the user's home directory
 func (pn *PathNormalizer) GetHomeDir() string {
     return pn.homeDir
+}
+
+// ValidateStoragePath checks if a stored path is valid
+func (pn *PathNormalizer) ValidateStoragePath(path string) bool {
+    // Must be absolute
+    if !filepath.IsAbs(path) {
+        return false
+    }
+    
+    // Must be clean
+    if filepath.Clean(path) != path {
+        return false
+    }
+    
+    return true
 }

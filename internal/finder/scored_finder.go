@@ -57,17 +57,26 @@ func (sf *ScoredFinder) FindScoredFiles(root string) (<-chan ScoredFile, error) 
 
     // Process files
     for path := range files {
-        // Normalize the path for scoring
-        normalizedPath, err := sf.normalizer.NormalizePath(path)
+        // First convert to storage path for scoring
+        storagePath, err := sf.normalizer.ToStoragePath(path)
         if err != nil {
-            fmt.Printf("Warning: couldn't normalize path %s: %v\n", path, err)
+            fmt.Printf("Warning: couldn't convert path %s: %v\n", path, err)
             continue
         }
 
-        // Get score and add to slice
-        score := sf.scorer.GetScore(normalizedPath)
+        // Get the score using the storage path
+        score := sf.scorer.GetScore(storagePath)
+
+        // Convert back to display path
+        displayPath, err := sf.normalizer.ToDisplayPath(storagePath)
+        if err != nil {
+            fmt.Printf("Warning: couldn't convert display path %s: %v\n", storagePath, err)
+            continue
+        }
+
+        // Add to scored files with display path
         scoredFiles = append(scoredFiles, ScoredFile{
-            Path:  path,
+            Path:  displayPath,
             Score: score,
         })
     }

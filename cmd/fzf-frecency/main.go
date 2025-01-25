@@ -21,10 +21,18 @@ func main() {
 
     // Create frecency scorer
     dataFile := filepath.Join(normalizer.GetHomeDir(), ".fzf_frecency.json")
-    scorer, err := frecency.NewFrecencyScore(dataFile)
+    scorer, err := frecency.NewFrecencyScore(dataFile, normalizer)
     if err != nil {
         fmt.Fprintf(os.Stderr, "Error creating scorer: %v\n", err)
         os.Exit(1)
+    }
+
+    // Migrate records and prune missing files
+    if err := scorer.MigrateRecords(); err != nil {
+        fmt.Fprintf(os.Stderr, "Warning: Error during migration: %v\n", err)
+    }
+    if err := scorer.PruneMissingFiles(); err != nil {
+        fmt.Fprintf(os.Stderr, "Warning: Error during pruning: %v\n", err)
     }
 
     // Create scored finder
@@ -44,7 +52,7 @@ func main() {
         os.Exit(1)
     }
 
-    // Setup FZF options with default preview
+    // Setup FZF options
     opts := fzf.DefaultOptions()
 
     // Run FZF
@@ -56,19 +64,12 @@ func main() {
 
     // Handle selected files
     for _, path := range selected {
-        // Update frecency score for selected file
-        normalized, err := normalizer.NormalizePath(path)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "Error normalizing path: %v\n", err)
-            continue
-        }
-        
-        if err := scorer.UpdateAccess(normalized); err != nil {
+        if err := scorer.UpdateAccess(path); err != nil {
             fmt.Fprintf(os.Stderr, "Error updating frecency: %v\n", err)
             continue
         }
         
-        // Print selected path (can be used by shell script)
+        // Print selected path for shell script
         fmt.Println(path)
     }
 }
