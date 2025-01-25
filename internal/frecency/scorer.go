@@ -1,5 +1,10 @@
 package frecency
 
+import (
+    "fmt"
+    "os"
+)
+
 // FrecencyScore manages file access records and scoring
 type FrecencyScore struct {
     records  map[string]*FileRecord

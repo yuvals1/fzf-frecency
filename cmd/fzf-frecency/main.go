@@ -5,7 +5,9 @@ import (
     "os"
     "path/filepath"
 
+    "github.com/yuvals1/fzf-frecency/internal/finder"
     "github.com/yuvals1/fzf-frecency/internal/frecency"
+    "github.com/yuvals1/fzf-frecency/internal/fzf"
     "github.com/yuvals1/fzf-frecency/internal/pathutil"
 )
 
@@ -17,7 +19,7 @@ func main() {
         os.Exit(1)
     }
 
-    // Create frecency scorer with data file in home directory
+    // Create frecency scorer
     dataFile := filepath.Join(normalizer.GetHomeDir(), ".fzf_frecency.json")
     scorer, err := frecency.NewFrecencyScore(dataFile)
     if err != nil {
@@ -25,48 +27,48 @@ func main() {
         os.Exit(1)
     }
 
-    fmt.Printf("Using frecency data file: %s\n\n", dataFile)
+    // Create scored finder
+    scoredFinder := finder.NewScoredFinder(scorer, normalizer)
 
-    // Test paths
-    testPaths := []string{
-        "test.txt",
-        "./docs/readme.md",
-        "../parent/file.txt",
+    // Get current directory
+    dir, err := os.Getwd()
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+        os.Exit(1)
     }
 
-    fmt.Println("1. Current scores from saved data:")
-    for _, path := range testPaths {
+    // Find scored files
+    filesChan, err := scoredFinder.FindScoredFiles(dir)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Error finding files: %v\n", err)
+        os.Exit(1)
+    }
+
+    // Setup FZF options with default preview
+    opts := fzf.DefaultOptions()
+
+    // Run FZF
+    selected, err := fzf.RunFzf(filesChan, opts)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Error running fzf: %v\n", err)
+        os.Exit(1)
+    }
+
+    // Handle selected files
+    for _, path := range selected {
+        // Update frecency score for selected file
         normalized, err := normalizer.NormalizePath(path)
         if err != nil {
             fmt.Fprintf(os.Stderr, "Error normalizing path: %v\n", err)
             continue
         }
-        score := scorer.GetScore(normalized)
-        fmt.Printf("%-40s -> Score: %d\n", normalized, score)
-    }
-
-    fmt.Println("\n2. Updating access counts...")
-    for _, path := range testPaths[:2] {
-        normalized, err := normalizer.NormalizePath(path)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "Error normalizing path: %v\n", err)
-            continue
-        }
+        
         if err := scorer.UpdateAccess(normalized); err != nil {
-            fmt.Fprintf(os.Stderr, "Error updating access: %v\n", err)
+            fmt.Fprintf(os.Stderr, "Error updating frecency: %v\n", err)
             continue
         }
-        fmt.Printf("Accessed: %s\n", normalized)
-    }
-
-    fmt.Println("\n3. Final scores (should persist after restart):")
-    for _, path := range testPaths {
-        normalized, err := normalizer.NormalizePath(path)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "Error normalizing path: %v\n", err)
-            continue
-        }
-        score := scorer.GetScore(normalized)
-        fmt.Printf("%-40s -> Score: %d\n", normalized, score)
+        
+        // Print selected path (can be used by shell script)
+        fmt.Println(path)
     }
 }
