@@ -27,15 +27,21 @@ func main() {
         os.Exit(1)
     }
 
-    // Migrate records and prune missing files
-    if err := scorer.MigrateRecords(); err != nil {
-        fmt.Fprintf(os.Stderr, "Warning: Error during migration: %v\n", err)
-    }
-    if err := scorer.PruneMissingFiles(); err != nil {
-        fmt.Fprintf(os.Stderr, "Warning: Error during pruning: %v\n", err)
-    }
+    // Create base finder with fd
+    fileFinder := finder.NewFileFinder()
+    
+    // Configure fd options (can be made configurable via flags)
+    fileFinder.SetMaxDepth(8)
+    fileFinder.SetIncludeHidden(true)
+    fileFinder.SetExcludePatterns([]string{
+        ".git",
+        ".mypy_cache",
+        "node_modules",
+        "__pycache__",
+        ".pytest_cache",
+    })
 
-    // Create scored finder
+    // Create scored finder with our configured fd finder
     scoredFinder := finder.NewScoredFinder(scorer, normalizer)
 
     // Get current directory

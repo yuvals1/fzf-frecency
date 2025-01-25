@@ -1,89 +1,129 @@
 package finder
 
 import (
-    "io/fs"
+    "bufio"
+    "fmt"
     "os"
-    "path/filepath"
+    "os/exec"
     "strings"
 )
 
-// FileFinder handles file discovery and filtering
+// FileFinder handles file discovery using fd
 type FileFinder struct {
+    fdPath          string
     excludePatterns []string
     includeHidden   bool
-    useColor        bool
+    maxDepth        int
 }
 
 // NewFileFinder creates a new FileFinder with default settings
 func NewFileFinder() *FileFinder {
     return &FileFinder{
-        excludePatterns: []string{"*.mypy*", "*.git*"},
+        fdPath:          "fd",
+        excludePatterns: []string{".git", ".mypy_cache"},
         includeHidden:   true,
-        useColor:        true,
+        maxDepth:        8,
     }
 }
 
-// shouldExclude checks if a path should be excluded based on patterns
-func (f *FileFinder) shouldExclude(path string) bool {
-    // Always exclude "." and ".."
-    if path == "." || path == ".." {
-        return true
+// buildFdCommand constructs the fd command with appropriate flags
+func (f *FileFinder) buildFdCommand(root string) *exec.Cmd {
+    args := []string{
+        "--type", "f",         // files only
+        "--strip-cwd-prefix",  // remove ./ prefix
+        "--follow",           // follow symlinks
     }
 
-    // Check against exclude patterns
+    // Add max depth
+    args = append(args, "--max-depth", fmt.Sprintf("%d", f.maxDepth))
+
+    // Include hidden files if specified
+    if f.includeHidden {
+        args = append(args, "--hidden", "--no-ignore")
+    }
+
+    // Add exclude patterns
     for _, pattern := range f.excludePatterns {
-        if matched, _ := filepath.Match(pattern, filepath.Base(path)); matched {
-            return true
-        }
-        if strings.Contains(path, strings.TrimSuffix(pattern, "*")) {
-            return true
-        }
+        args = append(args, "--exclude", pattern)
     }
 
-    return false
+    // The search pattern is "." to match everything
+    args = append(args, ".")
+
+    cmd := exec.Command(f.fdPath, args...)
+    cmd.Dir = root // Set working directory instead of passing as argument
+
+    // For debugging
+    fmt.Fprintf(os.Stderr, "Running fd command: %s %s (in directory %s)\n", 
+        f.fdPath, strings.Join(args, " "), root)
+
+    return cmd
 }
 
 // FindFiles returns a channel of found files
 func (f *FileFinder) FindFiles(root string) (<-chan string, error) {
-    filesChan := make(chan string)
-
-    // Verify root exists
-    _, err := os.Stat(root)
-    if err != nil {
-        return nil, err
+    // Verify fd is installed
+    if _, err := exec.LookPath(f.fdPath); err != nil {
+        return nil, fmt.Errorf("fd command not found. Please install fd-find: %w", err)
     }
 
+    // Create and configure fd command
+    cmd := f.buildFdCommand(root)
+    
+    // Get stdout pipe
+    stdout, err := cmd.StdoutPipe()
+    if err != nil {
+        return nil, fmt.Errorf("creating stdout pipe: %w", err)
+    }
+
+    // Redirect stderr to os.Stderr for debugging
+    cmd.Stderr = os.Stderr
+
+    // Create output channel
+    filesChan := make(chan string)
+
+    // Start command
+    if err := cmd.Start(); err != nil {
+        return nil, fmt.Errorf("starting fd command: %w", err)
+    }
+
+    // Read output in goroutine
     go func() {
         defer close(filesChan)
 
-        filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-            if err != nil {
-                return err
+        scanner := bufio.NewScanner(stdout)
+        for scanner.Scan() {
+            path := strings.TrimSpace(scanner.Text())
+            if path != "" {
+                filesChan <- path
             }
+        }
 
-            // Skip excluded paths
-            if f.shouldExclude(path) {
-                if d.IsDir() {
-                    return filepath.SkipDir
-                }
-                return nil
-            }
-
-            // Skip directories
-            if d.IsDir() {
-                return nil
-            }
-
-            // Make path relative to root
-            relPath, err := filepath.Rel(root, path)
-            if err != nil {
-                return err
-            }
-
-            filesChan <- relPath
-            return nil
-        })
+        // Wait for command to complete
+        if err := cmd.Wait(); err != nil {
+            fmt.Fprintf(os.Stderr, "Error running fd: %v\n", err)
+        }
     }()
 
     return filesChan, nil
+}
+
+// SetMaxDepth sets the maximum directory depth to search
+func (f *FileFinder) SetMaxDepth(depth int) {
+    f.maxDepth = depth
+}
+
+// SetExcludePatterns sets the patterns to exclude from search
+func (f *FileFinder) SetExcludePatterns(patterns []string) {
+    f.excludePatterns = patterns
+}
+
+// SetIncludeHidden sets whether to include hidden files
+func (f *FileFinder) SetIncludeHidden(include bool) {
+    f.includeHidden = include
+}
+
+// SetFdPath sets the path to the fd executable
+func (f *FileFinder) SetFdPath(path string) {
+    f.fdPath = path
 }
