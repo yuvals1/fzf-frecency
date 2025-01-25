@@ -37,27 +37,33 @@ func (pn *PathNormalizer) NormalizePath(path string) (string, error) {
     // Clean the path first
     path = filepath.Clean(path)
     
+    // If path is already relative and contains .., return it as is
+    if !filepath.IsAbs(path) && strings.HasPrefix(path, "..") {
+        return path, nil
+    }
+    
     // Convert to absolute path if relative
+    absPath := path
     if !filepath.IsAbs(path) {
-        path = filepath.Join(pn.currentDir, path)
+        absPath = filepath.Join(pn.currentDir, path)
     }
     
     // Try to make it relative to current directory
-    relToCurrent, err := filepath.Rel(pn.currentDir, path)
+    relToCurrent, err := filepath.Rel(pn.currentDir, absPath)
     if err == nil && !strings.HasPrefix(relToCurrent, "..") {
         return relToCurrent, nil
     }
     
     // If path is under home directory, make it relative to home
-    if strings.HasPrefix(path, pn.homeDir) {
-        relToHome, err := filepath.Rel(pn.homeDir, path)
+    if strings.HasPrefix(absPath, pn.homeDir) {
+        relToHome, err := filepath.Rel(pn.homeDir, absPath)
         if err == nil {
             return relToHome, nil
         }
     }
     
     // If we can't make it relative, return the cleaned absolute path
-    return path, nil
+    return absPath, nil
 }
 
 func main() {
@@ -67,12 +73,14 @@ func main() {
         os.Exit(1)
     }
 
-    // Test cases
+    // Extended test cases
     testPaths := []string{
-        "test.txt",
-        "./test.txt",
-        "../test.txt",
-        "/absolute/path/test.txt",
+        "test.txt",                   // Current directory file
+        "./test.txt",                 // Explicit current directory
+        "../test.txt",                // Parent directory
+        "../../test.txt",             // Multiple parent directories
+        "/absolute/path/test.txt",    // Absolute path
+        filepath.Join(normalizer.homeDir, "Documents/test.txt"), // Home directory path
     }
 
     fmt.Println("Current directory:", normalizer.currentDir)
@@ -85,6 +93,6 @@ func main() {
             fmt.Printf("Error normalizing %s: %v\n", path, err)
             continue
         }
-        fmt.Printf("Original: %-20s -> Normalized: %s\n", path, normalized)
+        fmt.Printf("Original: %-40s -> Normalized: %s\n", path, normalized)
     }
 }
