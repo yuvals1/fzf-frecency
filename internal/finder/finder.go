@@ -11,26 +11,16 @@ import (
 type FileFinder struct {
     excludePatterns []string
     includeHidden   bool
+    useColor        bool
 }
 
 // NewFileFinder creates a new FileFinder with default settings
 func NewFileFinder() *FileFinder {
     return &FileFinder{
-        excludePatterns: []string{".git", ".mypy_cache"},
+        excludePatterns: []string{"*.mypy*", "*.git*"},
         includeHidden:   true,
+        useColor:        true,
     }
-}
-
-// WithExcludePatterns adds patterns to exclude from search
-func (f *FileFinder) WithExcludePatterns(patterns []string) *FileFinder {
-    f.excludePatterns = append(f.excludePatterns, patterns...)
-    return f
-}
-
-// WithHidden sets whether to include hidden files
-func (f *FileFinder) WithHidden(include bool) *FileFinder {
-    f.includeHidden = include
-    return f
 }
 
 // shouldExclude checks if a path should be excluded based on patterns
@@ -42,14 +32,12 @@ func (f *FileFinder) shouldExclude(path string) bool {
 
     // Check against exclude patterns
     for _, pattern := range f.excludePatterns {
-        if strings.Contains(path, pattern) {
+        if matched, _ := filepath.Match(pattern, filepath.Base(path)); matched {
             return true
         }
-    }
-
-    // Handle hidden files
-    if !f.includeHidden && strings.HasPrefix(filepath.Base(path), ".") {
-        return true
+        if strings.Contains(path, strings.TrimSuffix(pattern, "*")) {
+            return true
+        }
     }
 
     return false
@@ -73,8 +61,16 @@ func (f *FileFinder) FindFiles(root string) (<-chan string, error) {
                 return err
             }
 
-            // Skip directories and excluded paths
-            if d.IsDir() || f.shouldExclude(path) {
+            // Skip excluded paths
+            if f.shouldExclude(path) {
+                if d.IsDir() {
+                    return filepath.SkipDir
+                }
+                return nil
+            }
+
+            // Skip directories
+            if d.IsDir() {
                 return nil
             }
 
