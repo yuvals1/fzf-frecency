@@ -41,6 +41,8 @@ func FormatScore(score int) string {
 }
 
 // FormatSplitPath formats a path by separating filename and directory with colors and icons
+// In style.go
+
 func FormatSplitPath(path string) string {
     filename := filepath.Base(path)
     dirname := filepath.Dir(path)
@@ -65,8 +67,8 @@ func FormatSplitPath(path string) string {
         return fmt.Sprintf("%s%s", iconPart, filename)
     }
 
-    // Removed fixed width formatting to avoid overflow
-    return fmt.Sprintf("%s%s %s%s%s",
+    // Add multiple spaces between filename and directory (e.g., 4 spaces)
+    return fmt.Sprintf("%s%s    %s%s%s",
         iconPart,
         filename,
         Blue, dirname, Reset)
