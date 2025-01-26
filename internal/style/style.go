@@ -1,7 +1,6 @@
 package style
 
 import (
-	"os"
     "fmt"
     "path/filepath"
     "strings"
@@ -9,14 +8,14 @@ import (
 
 // ANSI color codes
 const (
-    Reset     = "\033[0m"
-    Bold      = "\033[1m"
-    Blue      = "\033[34m"
-    Green     = "\033[32m"
-    Red       = "\033[31m"
-    Cyan      = "\033[36m"
-    Yellow    = "\033[33m"
-    Magenta   = "\033[35m"
+    Reset    = "\033[0m"
+    Bold     = "\033[1m"
+    Blue     = "\033[34m"
+    Green    = "\033[32m"
+    Red      = "\033[31m"
+    Cyan     = "\033[36m"
+    Yellow   = "\033[33m"
+    Magenta  = "\033[35m"
 )
 
 var iconMap *IconMap
@@ -49,16 +48,13 @@ func FormatSplitPath(path string) string {
     // Get icon definition for this file
     iconDef := iconMap.Get(filename)
     
-    // Print for debugging
-    fmt.Fprintf(os.Stderr, "File: %s, Icon: %s, Color: %s\n", filename, iconDef.Icon, iconDef.Color)
-    
     if dirname == "." {
         dirname = ""
     } else if strings.HasPrefix(dirname, "./") {
         dirname = dirname[2:]
     }
 
-    // Apply colors explicitly based on file type
+    // Apply colors based on file type
     fileColor := iconDef.Color
     dirColor := Blue
 
@@ -74,7 +70,7 @@ func FormatSplitPath(path string) string {
         dirColor, dirname, Reset)
 }
 
-// FormatPath returns a colored path based on its extension (legacy function)
+// FormatPath returns a colored path based on its extension
 func FormatPath(path string) string {
     if strings.HasPrefix(path, "./") {
         path = path[2:]
