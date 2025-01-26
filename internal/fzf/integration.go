@@ -41,10 +41,7 @@ func DefaultOptions() *FzfOptions {
 // FormatScoredFile formats a scored file for FZF display with colors
 func FormatScoredFile(file finder.ScoredFile) string {
     score := style.FormatScore(file.Score)
-    formattedPath := file.Path
-    if strings.HasPrefix(formattedPath, "./") {
-        formattedPath = formattedPath[2:]
-    }
+    formattedPath := style.FormatPath(file.Path)
     return fmt.Sprintf("%s\t%s", score, formattedPath)
 }
 

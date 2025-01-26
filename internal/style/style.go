@@ -2,6 +2,8 @@ package style
 
 import (
     "fmt"
+    "path/filepath"
+    "strings"
 )
 
 // ANSI color codes
@@ -30,4 +32,33 @@ func FormatScore(score int) string {
         color = Reset
     }
     return fmt.Sprintf("%s%5d%s", color, score, Reset)
+}
+
+// FormatPath returns a colored path based on its extension
+func FormatPath(path string) string {
+    if strings.HasPrefix(path, "./") {
+        path = path[2:]
+    }
+
+    ext := strings.ToLower(filepath.Ext(path))
+    var color string
+
+    switch ext {
+    case ".go":
+        color = Cyan
+    case ".py", ".pyc":
+        color = Blue
+    case ".js", ".ts", ".jsx", ".tsx":
+        color = Yellow
+    case ".html", ".css", ".scss":
+        color = Magenta
+    case ".md", ".txt":
+        color = Green
+    case ".json", ".yaml", ".yml":
+        color = Red
+    default:
+        color = Reset
+    }
+
+    return fmt.Sprintf("%s%s%s", color, path, Reset)
 }

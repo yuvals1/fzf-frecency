@@ -22,7 +22,7 @@ type FileFinder struct {
 func NewFileFinder() *FileFinder {
     return &FileFinder{
         fdPath:          "fd",
-        excludePatterns: []string{".git", ".mypy_cache", "node_modules", "__pycache__", ".pytest_cache"},
+        excludePatterns: []string{"*.mypy", "*.git", "*.mypy_cache"},
         includeHidden:   true,
         maxDepth:        8,
     }
@@ -34,6 +34,7 @@ func (f *FileFinder) buildFdCommand(root string) *exec.Cmd {
         "--type", "f",         // files only
         "--strip-cwd-prefix",  // remove ./ prefix
         "--follow",           // follow symlinks
+        "--color", "always",  // ensure colored output
     }
 
     // Add max depth
@@ -41,7 +42,7 @@ func (f *FileFinder) buildFdCommand(root string) *exec.Cmd {
 
     // Include hidden files if specified
     if f.includeHidden {
-        args = append(args, "--hidden", "--no-ignore")
+        args = append(args, "--hidden")  // Removed --no-ignore to respect .gitignore
     }
 
     // Add exclude patterns
