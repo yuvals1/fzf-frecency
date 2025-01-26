@@ -11,7 +11,6 @@ import (
     "github.com/yuvals1/fzf-frecency/internal/style"
 )
 
-// FzfOptions contains configuration for fzf
 type FzfOptions struct {
     Preview      string
     Height       string
@@ -20,10 +19,9 @@ type FzfOptions struct {
     KeyBindings  map[string]string
 }
 
-// DefaultOptions returns default FZF options matching user's configuration
 func DefaultOptions() *FzfOptions {
     return &FzfOptions{
-        Preview:     "bat -n --color=always $(echo {2..} | sed 's|^~/|'$HOME'/|')",  // Expand ~ in preview
+        Preview:     "bat --style=numbers --color=always {3}",  // Use raw path in third column
         Height:      "100%",
         MultiSelect: false,
         KeyBindings: map[string]string{
@@ -31,24 +29,21 @@ func DefaultOptions() *FzfOptions {
             "shift-down": "preview-page-down",
         },
         ExtraArgs: []string{
-            "--ansi",            // Enable ANSI color codes
-            "--delimiter=\\t",   // Use tab as delimiter
-            "--with-nth=1,2",   // Show only score and path columns
-            "--preview-window=up:60%", // Show preview window above
-            "--tiebreak", "index",  // Maintain original scoring order when filtering
-            "--no-sort",        // Don't sort matches, maintain our scoring
+            "--ansi",
+            "--delimiter=\\t",
+            "--with-nth=1,2",  // Show only score and formatted path
+            "--preview-window=up:60%",
+            "--tiebreak", "index",
+            "--no-sort",
         },
     }
 }
 
-// FormatScoredFile formats a scored file for FZF display with colors
 func FormatScoredFile(file finder.ScoredFile) string {
     score := style.FormatScore(file.Score)
-    formattedPath := style.FormatPath(file.Path)  // Add this line to apply the styling
-    if strings.HasPrefix(formattedPath, "./") {
-        formattedPath = formattedPath[2:]
-    }
-    return fmt.Sprintf("%s\t%s", score, formattedPath)
+    displayPath := style.FormatSplitPath(file.Path)
+    // Include raw path in hidden column for preview
+    return fmt.Sprintf("%s\t%s\t%s", score, displayPath, file.RawPath)
 }
 // RunFzf runs fzf with the provided scored files
 func RunFzf(files <-chan finder.ScoredFile, opts *FzfOptions) ([]string, error) {

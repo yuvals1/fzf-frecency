@@ -11,21 +11,19 @@ import (
 
 // ScoredFile represents a file with its frecency score
 type ScoredFile struct {
-    Path  string
-    Score int
+    RawPath  string  // Original unmodified path for operations
+    Path     string  // Path for display
+    Score    int
 }
 
-// ScoredFiles is a slice of ScoredFile that can be sorted
 type ScoredFiles []ScoredFile
 
 func (sf ScoredFiles) Len() int      { return len(sf) }
 func (sf ScoredFiles) Swap(i, j int) { sf[i], sf[j] = sf[j], sf[i] }
 func (sf ScoredFiles) Less(i, j int) bool {
-    // Sort by score (highest first)
     if sf[i].Score != sf[j].Score {
         return sf[i].Score > sf[j].Score
     }
-    // Then by path (alphabetically)
     return sf[i].Path < sf[j].Path
 }
 
@@ -57,8 +55,7 @@ func (sf *ScoredFinder) processFile(path string) (ScoredFile, error) {
     score := sf.scorer.GetScore(storagePath)
     log.Debug("Got score %d for storage path: %s", score, storagePath)
 
-    // Keep the original path for display
-    // Only try to make it relative if it's under current directory
+    // Keep both raw and display paths
     displayPath := path
     if rel, err := sf.normalizer.ToDisplayPath(storagePath); err == nil {
         if !sf.normalizer.IsOutsideCurrentDir(rel) {
@@ -67,8 +64,9 @@ func (sf *ScoredFinder) processFile(path string) (ScoredFile, error) {
     }
 
     return ScoredFile{
-        Path:  displayPath,
-        Score: score,
+        RawPath:  path,        // Original path for operations
+        Path:     displayPath, // Path for display
+        Score:    score,
     }, nil
 }
 

@@ -18,7 +18,29 @@ const (
     Magenta   = "\033[35m"
 )
 
-// FormatScore returns a colored score based on its value
+// File type icons mapping
+var fileIcons = map[string]string{
+    ".go":     "󰈔",
+    ".py":     "",
+    ".js":     "",
+    ".json":   "󰘦",
+    ".md":     "",
+    ".txt":    "",
+    ".yml":    "",
+    ".yaml":   "",
+    ".cpp":    "",
+    ".h":      "",
+    ".svelte": "󰎔",
+    "":        "󰈔",
+}
+
+func getFileIcon(ext string) string {
+    if icon, exists := fileIcons[ext]; exists {
+        return icon + " "
+    }
+    return fileIcons[""] + " "
+}
+
 func FormatScore(score int) string {
     var color string
     switch {
@@ -34,31 +56,43 @@ func FormatScore(score int) string {
     return fmt.Sprintf("%s%5d%s", color, score, Reset)
 }
 
-// FormatPath returns a colored path based on its extension
-func FormatPath(path string) string {
-    if strings.HasPrefix(path, "./") {
-        path = path[2:]
+func FormatSplitPath(path string) string {
+    filename := filepath.Base(path)
+    dirname := filepath.Dir(path)
+    
+    if dirname == "." {
+        dirname = ""
+    } else if strings.HasPrefix(dirname, "./") {
+        dirname = dirname[2:]
     }
 
-    ext := strings.ToLower(filepath.Ext(path))
-    var color string
+    ext := strings.ToLower(filepath.Ext(filename))
+    icon := getFileIcon(ext)
 
+    var fileColor string
     switch ext {
     case ".go":
-        color = Cyan
+        fileColor = Cyan
     case ".py", ".pyc":
-        color = Blue
-    case ".js", ".ts", ".jsx", ".tsx":
-        color = Yellow
-    case ".html", ".css", ".scss":
-        color = Magenta
-    case ".md", ".txt":
-        color = Green
-    case ".json", ".yaml", ".yml":
-        color = Red
+        fileColor = Blue
+    case ".cpp", ".h":
+        fileColor = Green
+    case ".svelte":
+        fileColor = Red
     default:
-        color = Reset
+        fileColor = Reset
     }
 
-    return fmt.Sprintf("%s%s%s", color, path, Reset)
+    dirColor := Blue
+
+    if dirname == "" {
+        return fmt.Sprintf("%s%s%s%s", 
+            icon,
+            fileColor, filename, Reset)
+    }
+
+    return fmt.Sprintf("%s%s%-30s%s %s%s%s",
+        icon,
+        fileColor, filename, Reset,
+        dirColor, dirname, Reset)
 }
