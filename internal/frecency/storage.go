@@ -20,6 +20,7 @@ func (fs *FrecencyScore) Load() error {
     }
     
     // Convert slice to map
+    fs.records = make(map[string]*FileRecord)
     for _, record := range records {
         fs.records[record.Path] = record
     }

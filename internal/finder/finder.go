@@ -6,6 +6,8 @@ import (
     "os"
     "os/exec"
     "strings"
+
+    "github.com/yuvals1/fzf-frecency/internal/log"
 )
 
 // FileFinder handles file discovery using fd
@@ -20,7 +22,7 @@ type FileFinder struct {
 func NewFileFinder() *FileFinder {
     return &FileFinder{
         fdPath:          "fd",
-        excludePatterns: []string{".git", ".mypy_cache"},
+        excludePatterns: []string{".git", ".mypy_cache", "node_modules", "__pycache__", ".pytest_cache"},
         includeHidden:   true,
         maxDepth:        8,
     }
@@ -53,8 +55,8 @@ func (f *FileFinder) buildFdCommand(root string) *exec.Cmd {
     cmd := exec.Command(f.fdPath, args...)
     cmd.Dir = root // Set working directory instead of passing as argument
 
-    // For debugging
-    fmt.Fprintf(os.Stderr, "Running fd command: %s %s (in directory %s)\n", 
+    // Minimal logging that was in the original version
+    log.Debug("Running fd command: %s %s (in directory %s)", 
         f.fdPath, strings.Join(args, " "), root)
 
     return cmd

@@ -5,6 +5,7 @@ import (
     "sort"
 
     "github.com/yuvals1/fzf-frecency/internal/frecency"
+    "github.com/yuvals1/fzf-frecency/internal/log"
     "github.com/yuvals1/fzf-frecency/internal/pathutil"
 )
 
@@ -60,18 +61,18 @@ func (sf *ScoredFinder) FindScoredFiles(root string) (<-chan ScoredFile, error) 
         // First convert to storage path for scoring
         storagePath, err := sf.normalizer.ToStoragePath(path)
         if err != nil {
-            fmt.Printf("Warning: couldn't convert path %s: %v\n", path, err)
+            log.Debug("Warning: couldn't convert path %s: %v", path, err)
             continue
         }
 
         // Get the score using the storage path
         score := sf.scorer.GetScore(storagePath)
+        log.Debug("Got score %d for path: %s", score, storagePath)
 
         // Convert back to display path
-        displayPath, err := sf.normalizer.ToDisplayPath(storagePath)
-        if err != nil {
-            fmt.Printf("Warning: couldn't convert display path %s: %v\n", storagePath, err)
-            continue
+        displayPath := path // default to original path
+        if rel, err := sf.normalizer.ToDisplayPath(storagePath); err == nil {
+            displayPath = rel
         }
 
         // Add to scored files with display path

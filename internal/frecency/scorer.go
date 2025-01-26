@@ -9,8 +9,8 @@ import (
 
 // FrecencyScore manages file access records and scoring
 type FrecencyScore struct {
-    records   map[string]*FileRecord // key is absolute path
-    dataFile  string
+    records    map[string]*FileRecord
+    dataFile   string
     normalizer *pathutil.PathNormalizer
 }
 
@@ -27,33 +27,15 @@ func NewFrecencyScore(dataFile string, normalizer *pathutil.PathNormalizer) (*Fr
         return nil, fmt.Errorf("loading frecency data: %w", err)
     }
     
-    // Validate all loaded paths
-    for path := range fs.records {
-        if !normalizer.ValidateStoragePath(path) {
-            delete(fs.records, path)
-        }
-    }
-    
-    // Save cleaned records
-    if err := fs.Save(); err != nil {
-        return nil, fmt.Errorf("saving cleaned records: %w", err)
-    }
-    
     return fs, nil
 }
 
 // GetScore returns the frecency score for a path
 func (fs *FrecencyScore) GetScore(path string) int {
-    storagePath, err := fs.normalizer.ToStoragePath(path)
-    if err != nil {
-        return 0
+    if record, exists := fs.records[path]; exists {
+        return record.CalculateScore()
     }
-    
-    record, exists := fs.records[storagePath]
-    if !exists {
-        return 0
-    }
-    return record.CalculateScore()
+    return 0
 }
 
 // UpdateAccess records a new access for a path
@@ -70,31 +52,6 @@ func (fs *FrecencyScore) UpdateAccess(path string) error {
     }
     
     record.UpdateAccess()
-    return fs.Save()
-}
-
-// GetAllScores returns all paths and their current scores with display paths
-func (fs *FrecencyScore) GetAllScores() (map[string]int, error) {
-    scores := make(map[string]int)
-    
-    for storagePath, record := range fs.records {
-        displayPath, err := fs.normalizer.ToDisplayPath(storagePath)
-        if err != nil {
-            continue // Skip paths we can't display
-        }
-        scores[displayPath] = record.CalculateScore()
-    }
-    
-    return scores, nil
-}
-
-// PruneMissingFiles removes records for files that no longer exist
-func (fs *FrecencyScore) PruneMissingFiles() error {
-    for path := range fs.records {
-        if _, err := os.Stat(path); os.IsNotExist(err) {
-            delete(fs.records, path)
-        }
-    }
     return fs.Save()
 }
 
@@ -118,8 +75,8 @@ func (fs *FrecencyScore) MigrateRecords() error {
                 existingRecord.LastAccess = record.LastAccess
             }
         } else {
+            record.Path = newPath
             newRecords[newPath] = record
-            record.Path = newPath // Update the path in the record
         }
     }
     

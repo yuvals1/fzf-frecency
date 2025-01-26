@@ -20,10 +20,10 @@ type FzfOptions struct {
     KeyBindings  map[string]string
 }
 
-// DefaultOptions returns default FZF options
+// DefaultOptions returns default FZF options matching user's configuration
 func DefaultOptions() *FzfOptions {
     return &FzfOptions{
-        Preview:     "bat -n --color=always {2..}",
+        Preview:     "bat -n --color=always {2..}",  // Use {2..} to skip the score column
         Height:      "100%",
         MultiSelect: false,
         KeyBindings: map[string]string{
@@ -31,18 +31,20 @@ func DefaultOptions() *FzfOptions {
             "shift-down": "preview-page-down",
         },
         ExtraArgs: []string{
-            "--ansi",
-            "--border",
-            "--delimiter=\t",
-            "--with-nth=1,2",
+            "--ansi",            // Enable ANSI color codes
+            "--delimiter=\\t",   // Use tab as delimiter
+            "--with-nth=1,2",   // Show only score and path columns
         },
     }
 }
 
-// FormatScoredFile formats a scored file for FZF display with colors and icons
+// FormatScoredFile formats a scored file for FZF display with colors
 func FormatScoredFile(file finder.ScoredFile) string {
     score := style.FormatScore(file.Score)
-    formattedPath := style.FormatPath(file.Path)
+    formattedPath := file.Path
+    if strings.HasPrefix(formattedPath, "./") {
+        formattedPath = formattedPath[2:]
+    }
     return fmt.Sprintf("%s\t%s", score, formattedPath)
 }
 
@@ -52,11 +54,14 @@ func RunFzf(files <-chan finder.ScoredFile, opts *FzfOptions) ([]string, error) 
         opts = DefaultOptions()
     }
 
-    args := []string{
-        "--height", opts.Height,
-        "--preview", opts.Preview,
+    args := []string{}
+    
+    // Add preview command
+    if opts.Preview != "" {
+        args = append(args, "--preview", opts.Preview)
     }
     
+    // Add key bindings
     for key, action := range opts.KeyBindings {
         args = append(args, fmt.Sprintf("--bind=%s:%s", key, action))
     }
@@ -98,7 +103,7 @@ func RunFzf(files <-chan finder.ScoredFile, opts *FzfOptions) ([]string, error) 
 
     if err := cmd.Wait(); err != nil {
         if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 130 {
-            return nil, nil
+            return nil, nil // User cancelled with ESC
         }
         return nil, fmt.Errorf("fzf process: %w", err)
     }
@@ -108,11 +113,15 @@ func RunFzf(files <-chan finder.ScoredFile, opts *FzfOptions) ([]string, error) 
         if line == "" {
             continue
         }
+        // Split by tab and take the path part (second column)
         parts := strings.SplitN(line, "\t", 2)
         if len(parts) == 2 {
-            // Strip ANSI codes from the path before returning
-            cleanPath := style.StripAnsi(parts[1])
-            results = append(results, cleanPath)
+            path := parts[1]
+            // Remove ./ prefix if present
+            if strings.HasPrefix(path, "./") {
+                path = path[2:]
+            }
+            results = append(results, path)
         }
     }
 
