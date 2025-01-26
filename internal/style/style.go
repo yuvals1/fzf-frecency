@@ -65,7 +65,8 @@ func FormatSplitPath(path string) string {
         return fmt.Sprintf("%s%s", iconPart, filename)
     }
 
-    return fmt.Sprintf("%s%-30s %s%s%s",
+    // Removed fixed width formatting to avoid overflow
+    return fmt.Sprintf("%s%s %s%s%s",
         iconPart,
         filename,
         Blue, dirname, Reset)
