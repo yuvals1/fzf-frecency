@@ -21,6 +21,12 @@ func colorToANSI(color string) string {
     if color == "" || color == "Reset" {
         return Reset
     }
+    
+    // Handle case where color might be empty or invalid
+    if color == "" {
+        return Reset
+    }
+    
     // Convert numeric color code to ANSI escape sequence
     return fmt.Sprintf("\033[38;5;%sm", color)
 }
@@ -31,11 +37,11 @@ func NewIconMap() *IconMap {
         icons: make(map[string]IconDef),
     }
 
-    // Copy generated icons
+    // Copy generated icons, converting to lowercase for case-insensitive matching
     for k, v := range defaultIcons {
-        im.icons[k] = IconDef{
+        im.icons[strings.ToLower(k)] = IconDef{
             Icon:  v.Icon,
-            Color: colorToANSI(v.Color), // Convert color code to ANSI sequence
+            Color: colorToANSI(v.Color),
         }
     }
 
@@ -49,7 +55,7 @@ func NewIconMap() *IconMap {
 
 func (im *IconMap) Get(path string) IconDef {
     ext := strings.ToLower(filepath.Ext(path))
-    name := filepath.Base(path)
+    name := strings.ToLower(filepath.Base(path))
 
     // Try exact filename match
     if val, ok := im.icons[name]; ok {
@@ -68,8 +74,8 @@ func (im *IconMap) Get(path string) IconDef {
         }
     }
 
-    // Return default icon
-    return im.icons[""]
+    // Return empty icon definition instead of default
+    return IconDef{Icon: "", Color: Reset}
 }
 
 func (im *IconMap) parseEnv(env string) {
@@ -83,7 +89,7 @@ func (im *IconMap) parseEnv(env string) {
             continue
         }
 
-        im.icons[parts[0]] = IconDef{
+        im.icons[strings.ToLower(parts[0])] = IconDef{
             Icon:  parts[1], 
             Color: Reset,
         }

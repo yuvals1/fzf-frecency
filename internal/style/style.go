@@ -54,15 +54,19 @@ func FormatSplitPath(path string) string {
         dirname = dirname[2:]
     }
 
-    // Color the icon, but keep filename text in default color
-    if dirname == "" {
-        return fmt.Sprintf("%s%s%s %s", 
-            iconDef.Color, iconDef.Icon, Reset,
-            filename)
+    // Build the icon part only if we have an icon
+    var iconPart string
+    if iconDef.Icon != "" {
+        iconPart = fmt.Sprintf("%s%s%s ", iconDef.Color, iconDef.Icon, Reset)
     }
 
-    return fmt.Sprintf("%s%s%s %-30s %s%s%s",
-        iconDef.Color, iconDef.Icon, Reset,
+    // Color the icon, but keep filename text in default color
+    if dirname == "" {
+        return fmt.Sprintf("%s%s", iconPart, filename)
+    }
+
+    return fmt.Sprintf("%s%-30s %s%s%s",
+        iconPart,
         filename,
         Blue, dirname, Reset)
 }
@@ -74,6 +78,9 @@ func FormatPath(path string) string {
     }
 
     iconDef := iconMap.Get(path)
+    if iconDef.Icon == "" {
+        return path
+    }
     return fmt.Sprintf("%s%s%s %s", iconDef.Color, iconDef.Icon, Reset, path)
 }
 
@@ -90,6 +97,9 @@ func GetColor(path string) string {
 // ColorizeFilename applies appropriate color to a filename
 func ColorizeFilename(filename string) string {
     iconDef := iconMap.Get(filename)
+    if iconDef.Icon == "" {
+        return filename
+    }
     return fmt.Sprintf("%s%s%s", iconDef.Color, iconDef.Icon, Reset)
 }
 

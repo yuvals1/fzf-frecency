@@ -42,9 +42,10 @@ func DefaultOptions() *FzfOptions {
 func FormatScoredFile(file finder.ScoredFile) string {
     score := style.FormatScore(file.Score)
     displayPath := style.FormatSplitPath(file.Path)
-    // Include raw path in hidden column for preview
+    // Store raw path in third column for selection and preview
     return fmt.Sprintf("%s\t%s\t%s", score, displayPath, file.RawPath)
 }
+
 // RunFzf runs fzf with the provided scored files
 func RunFzf(files <-chan finder.ScoredFile, opts *FzfOptions) ([]string, error) {
     if opts == nil {
@@ -110,15 +111,10 @@ func RunFzf(files <-chan finder.ScoredFile, opts *FzfOptions) ([]string, error) 
         if line == "" {
             continue
         }
-        // Split by tab and take the path part (second column)
-        parts := strings.SplitN(line, "\t", 2)
-        if len(parts) == 2 {
-            path := parts[1]
-            // Remove ./ prefix if present
-            if strings.HasPrefix(path, "./") {
-                path = path[2:]
-            }
-            results = append(results, path)
+        // Split by tab and take the raw path from the third column
+        parts := strings.SplitN(line, "\t", 4)
+        if len(parts) >= 3 {
+            results = append(results, parts[2]) // Use the raw path
         }
     }
 
