@@ -23,7 +23,7 @@ type FzfOptions struct {
 // DefaultOptions returns default FZF options matching user's configuration
 func DefaultOptions() *FzfOptions {
     return &FzfOptions{
-        Preview:     "bat -n --color=always {2..}",  // Use {2..} to skip the score column
+        Preview:     "bat -n --color=always $(echo {2..} | sed 's|^~/|'$HOME'/|')",  // Expand ~ in preview
         Height:      "100%",
         MultiSelect: false,
         KeyBindings: map[string]string{
@@ -34,7 +34,9 @@ func DefaultOptions() *FzfOptions {
             "--ansi",            // Enable ANSI color codes
             "--delimiter=\\t",   // Use tab as delimiter
             "--with-nth=1,2",   // Show only score and path columns
-            "--preview-window=up:60%", // Show preview window above, taking 60% of the space
+            "--preview-window=up:60%", // Show preview window above
+            "--tiebreak", "index",  // Maintain original scoring order when filtering
+            "--no-sort",        // Don't sort matches, maintain our scoring
         },
     }
 }
@@ -42,7 +44,10 @@ func DefaultOptions() *FzfOptions {
 // FormatScoredFile formats a scored file for FZF display with colors
 func FormatScoredFile(file finder.ScoredFile) string {
     score := style.FormatScore(file.Score)
-    formattedPath := style.FormatPath(file.Path)
+    formattedPath := file.Path
+    if strings.HasPrefix(formattedPath, "./") {
+        formattedPath = formattedPath[2:]
+    }
     return fmt.Sprintf("%s\t%s", score, formattedPath)
 }
 

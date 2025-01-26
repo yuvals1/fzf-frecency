@@ -45,7 +45,34 @@ func NewScoredFinder(scorer *frecency.FrecencyScore, normalizer *pathutil.PathNo
     }
 }
 
-// FindScoredFiles returns a channel of files with their frecency scores
+// processFile converts a file path to a ScoredFile
+func (sf *ScoredFinder) processFile(path string) (ScoredFile, error) {
+    // Convert to storage path for scoring
+    storagePath, err := sf.normalizer.ToStoragePath(path)
+    if err != nil {
+        return ScoredFile{}, fmt.Errorf("converting to storage path: %w", err)
+    }
+
+    // Get the score using the storage path
+    score := sf.scorer.GetScore(storagePath)
+    log.Debug("Got score %d for storage path: %s", score, storagePath)
+
+    // Keep the original path for display
+    // Only try to make it relative if it's under current directory
+    displayPath := path
+    if rel, err := sf.normalizer.ToDisplayPath(storagePath); err == nil {
+        if !sf.normalizer.IsOutsideCurrentDir(rel) {
+            displayPath = rel
+        }
+    }
+
+    return ScoredFile{
+        Path:  displayPath,
+        Score: score,
+    }, nil
+}
+
+// FindScoredFiles returns a channel of files with their frecency scores from a single directory
 func (sf *ScoredFinder) FindScoredFiles(root string) (<-chan ScoredFile, error) {
     // Get all files first
     files, err := sf.FindFiles(root)
@@ -58,31 +85,69 @@ func (sf *ScoredFinder) FindScoredFiles(root string) (<-chan ScoredFile, error) 
 
     // Process files
     for path := range files {
-        // First convert to storage path for scoring
-        storagePath, err := sf.normalizer.ToStoragePath(path)
+        scoredFile, err := sf.processFile(path)
         if err != nil {
-            log.Debug("Warning: couldn't convert path %s: %v", path, err)
+            log.Debug("Warning: couldn't process file %s: %v", path, err)
             continue
         }
-
-        // Get the score using the storage path
-        score := sf.scorer.GetScore(storagePath)
-        log.Debug("Got score %d for path: %s", score, storagePath)
-
-        // Convert back to display path
-        displayPath := path // default to original path
-        if rel, err := sf.normalizer.ToDisplayPath(storagePath); err == nil {
-            displayPath = rel
-        }
-
-        // Add to scored files with display path
-        scoredFiles = append(scoredFiles, ScoredFile{
-            Path:  displayPath,
-            Score: score,
-        })
+        scoredFiles = append(scoredFiles, scoredFile)
     }
 
     // Sort the files
+    sort.Sort(scoredFiles)
+
+    // Create output channel
+    out := make(chan ScoredFile)
+
+    // Send sorted files through channel
+    go func() {
+        defer close(out)
+        for _, file := range scoredFiles {
+            out <- file
+        }
+    }()
+
+    return out, nil
+}
+
+// FindScoredFilesInDirs returns a channel of scored files from multiple directories
+func (sf *ScoredFinder) FindScoredFilesInDirs(roots []string) (<-chan ScoredFile, error) {
+    // Get all files from all directories
+    filesChan, err := sf.FileFinder.FindFilesInDirs(roots)
+    if err != nil {
+        return nil, fmt.Errorf("finding files in directories: %w", err)
+    }
+
+    // Use a map to deduplicate files by storage path
+    seen := make(map[string]bool)
+    var scoredFiles ScoredFiles
+
+    // Process all files
+    for path := range filesChan {
+        // Get storage path for deduplication
+        storagePath, err := sf.normalizer.ToStoragePath(path)
+        if err != nil {
+            log.Debug("Warning: couldn't get storage path for %s: %v", path, err)
+            continue
+        }
+
+        // Skip if we've already seen this file
+        if seen[storagePath] {
+            log.Debug("Skipping duplicate file: %s", storagePath)
+            continue
+        }
+        seen[storagePath] = true
+
+        // Process the file
+        scoredFile, err := sf.processFile(path)
+        if err != nil {
+            log.Debug("Warning: couldn't process file %s: %v", path, err)
+            continue
+        }
+        scoredFiles = append(scoredFiles, scoredFile)
+    }
+
+    // Sort all files
     sort.Sort(scoredFiles)
 
     // Create output channel

@@ -1,17 +1,60 @@
 package main
 
 import (
+    "flag"
     "fmt"
     "os"
     "path/filepath"
+    "bufio"
+    "strings"
 
     "github.com/yuvals1/fzf-frecency/internal/finder"
     "github.com/yuvals1/fzf-frecency/internal/frecency"
     "github.com/yuvals1/fzf-frecency/internal/fzf"
     "github.com/yuvals1/fzf-frecency/internal/pathutil"
+    "github.com/yuvals1/fzf-frecency/internal/log"
 )
 
+type config struct {
+    usePresetDirs bool
+}
+
+func readPresetPaths() ([]string, error) {
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return nil, fmt.Errorf("getting home directory: %w", err)
+    }
+
+    presetFile := filepath.Join(homeDir, ".fzf_preset_paths")
+    file, err := os.Open(presetFile)
+    if err != nil {
+        return nil, fmt.Errorf("opening preset paths file %s: %w", presetFile, err)
+    }
+    defer file.Close()
+
+    var paths []string
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        path := strings.TrimSpace(scanner.Text())
+        if path != "" {
+            paths = append(paths, path)
+            log.Debug("Read preset path: %s", path)
+        }
+    }
+
+    if err := scanner.Err(); err != nil {
+        return nil, fmt.Errorf("reading preset paths: %w", err)
+    }
+
+    return paths, nil
+}
+
 func main() {
+    // Parse flags
+    cfg := config{}
+    flag.BoolVar(&cfg.usePresetDirs, "use-preset-dirs", false, "Use directories from preset paths file")
+    flag.Parse()
+
     // Initialize path normalizer
     normalizer, err := pathutil.NewPathNormalizer()
     if err != nil {
@@ -27,21 +70,17 @@ func main() {
         os.Exit(1)
     }
 
-    // Create base finder with fd
+    // Create base finder
     fileFinder := finder.NewFileFinder()
     
-    // Configure fd options (can be made configurable via flags)
-    fileFinder.SetMaxDepth(8)
-    fileFinder.SetIncludeHidden(true)
+    // Set exclude patterns to match user's configuration
     fileFinder.SetExcludePatterns([]string{
-        ".git",
-        ".mypy_cache",
-        "node_modules",
-        "__pycache__",
-        ".pytest_cache",
+        "*.mypy",
+        "*.mypy_cache",
+        "*.git",
     })
 
-    // Create scored finder with our configured fd finder
+    // Create scored finder
     scoredFinder := finder.NewScoredFinder(scorer, normalizer)
 
     // Get current directory
@@ -51,11 +90,36 @@ func main() {
         os.Exit(1)
     }
 
-    // Find scored files
-    filesChan, err := scoredFinder.FindScoredFiles(dir)
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "Error finding files: %v\n", err)
-        os.Exit(1)
+    // Find scored files based on mode
+    var filesChan <-chan finder.ScoredFile
+    if cfg.usePresetDirs {
+        // Get preset paths
+        presetPaths, err := readPresetPaths()
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "Error reading preset paths: %v\n", err)
+            os.Exit(1)
+        }
+        
+        // Add current directory to the list
+        searchPaths := append([]string{dir}, presetPaths...)
+        log.Debug("Searching in directories:")
+        for _, path := range searchPaths {
+            log.Debug("  %s", path)
+        }
+
+        // Use multi-directory search
+        filesChan, err = scoredFinder.FindScoredFilesInDirs(searchPaths)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "Error finding files in multiple directories: %v\n", err)
+            os.Exit(1)
+        }
+    } else {
+        // Use single directory search (original behavior)
+        filesChan, err = scoredFinder.FindScoredFiles(dir)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "Error finding files: %v\n", err)
+            os.Exit(1)
+        }
     }
 
     // Setup FZF options

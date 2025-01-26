@@ -96,6 +96,14 @@ func (pn *PathNormalizer) ToDisplayPath(storagePath string) (string, error) {
     return storagePath, nil
 }
 
+// IsOutsideCurrentDir checks if a path is outside the current directory
+func (pn *PathNormalizer) IsOutsideCurrentDir(path string) bool {
+    if filepath.IsAbs(path) {
+        return !strings.HasPrefix(filepath.Clean(path), filepath.Clean(pn.currentDir))
+    }
+    return strings.HasPrefix(path, "..")
+}
+
 // GetCurrentDir returns the current working directory
 func (pn *PathNormalizer) GetCurrentDir() string {
     return pn.currentDir
