@@ -34,6 +34,7 @@ func DefaultOptions() *FzfOptions {
             "--ansi",            // Enable ANSI color codes
             "--delimiter=\\t",   // Use tab as delimiter
             "--with-nth=1,2",   // Show only score and path columns
+            "--preview-window=up:60%", // Show preview window above, taking 60% of the space
         },
     }
 }
