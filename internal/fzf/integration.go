@@ -44,13 +44,12 @@ func DefaultOptions() *FzfOptions {
 // FormatScoredFile formats a scored file for FZF display with colors
 func FormatScoredFile(file finder.ScoredFile) string {
     score := style.FormatScore(file.Score)
-    formattedPath := file.Path
+    formattedPath := style.FormatPath(file.Path)  // Add this line to apply the styling
     if strings.HasPrefix(formattedPath, "./") {
         formattedPath = formattedPath[2:]
     }
     return fmt.Sprintf("%s\t%s", score, formattedPath)
 }
-
 // RunFzf runs fzf with the provided scored files
 func RunFzf(files <-chan finder.ScoredFile, opts *FzfOptions) ([]string, error) {
     if opts == nil {
