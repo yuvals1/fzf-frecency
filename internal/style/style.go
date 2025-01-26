@@ -1,6 +1,7 @@
 package style
 
 import (
+	"os"
     "fmt"
     "path/filepath"
     "strings"
@@ -45,29 +46,31 @@ func FormatSplitPath(path string) string {
     filename := filepath.Base(path)
     dirname := filepath.Dir(path)
     
-    // Clean up directory path
+    // Get icon definition for this file
+    iconDef := iconMap.Get(filename)
+    
+    // Print for debugging
+    fmt.Fprintf(os.Stderr, "File: %s, Icon: %s, Color: %s\n", filename, iconDef.Icon, iconDef.Color)
+    
     if dirname == "." {
         dirname = ""
     } else if strings.HasPrefix(dirname, "./") {
         dirname = dirname[2:]
     }
 
-    // Get icon and color for the file
-    iconDef := iconMap.Get(filename)
-
-    // Directory always uses blue
+    // Apply colors explicitly based on file type
+    fileColor := iconDef.Color
     dirColor := Blue
 
-    // Format the output based on whether we have a directory component
     if dirname == "" {
-        return fmt.Sprintf("%s %s%s%s", 
+        return fmt.Sprintf("%s%s%s%s", 
             iconDef.Icon,
-            iconDef.Color, filename, Reset)
+            fileColor, filename, Reset)
     }
 
-    return fmt.Sprintf("%s %s%-30s%s %s%s%s",
+    return fmt.Sprintf("%s%s%-30s%s %s%s%s",
         iconDef.Icon,
-        iconDef.Color, filename, Reset,
+        fileColor, filename, Reset,
         dirColor, dirname, Reset)
 }
 

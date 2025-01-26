@@ -15,13 +15,36 @@ type IconMap struct {
     icons map[string]IconDef
 }
 
+// NewIconMap now uses the generated defaultIcons
 func NewIconMap() *IconMap {
     im := &IconMap{
         icons: make(map[string]IconDef),
     }
 
-    // Load default icons
-    im.loadDefaults()
+    // Copy generated icons
+    for k, v := range defaultIcons {
+        // Convert the hex color from nvim-web-devicons to our ANSI colors
+        color := Reset
+        switch v.Color {
+        case "#51AFEF", "#2196F3", "#42A5F5":
+            color = Blue
+        case "#98C379", "#4CAF50":
+            color = Green
+        case "#FF7043", "#F44336":
+            color = Red
+        case "#FFB74D", "#FFA726":
+            color = Yellow
+        case "#26C6DA", "#00BCD4":
+            color = Cyan
+        case "#AB47BC", "#7E57C2":
+            color = Magenta
+        }
+        
+        im.icons[k] = IconDef{
+            Icon:  v.Icon,
+            Color: color,
+        }
+    }
 
     // Load from environment if present
     if env := os.Getenv("FZF_FRECENCY_ICONS"); env != "" {
