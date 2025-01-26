@@ -18,29 +18,13 @@ const (
     Magenta   = "\033[35m"
 )
 
-// File type icons mapping
-var fileIcons = map[string]string{
-    ".go":     "󰈔",
-    ".py":     "",
-    ".js":     "",
-    ".json":   "󰘦",
-    ".md":     "",
-    ".txt":    "",
-    ".yml":    "",
-    ".yaml":   "",
-    ".cpp":    "",
-    ".h":      "",
-    ".svelte": "󰎔",
-    "":        "󰈔",
+var iconMap *IconMap
+
+func init() {
+    iconMap = NewIconMap()
 }
 
-func getFileIcon(ext string) string {
-    if icon, exists := fileIcons[ext]; exists {
-        return icon + " "
-    }
-    return fileIcons[""] + " "
-}
-
+// FormatScore returns a colored score based on its value
 func FormatScore(score int) string {
     var color string
     switch {
@@ -56,43 +40,86 @@ func FormatScore(score int) string {
     return fmt.Sprintf("%s%5d%s", color, score, Reset)
 }
 
+// FormatSplitPath formats a path by separating filename and directory with colors and icons
 func FormatSplitPath(path string) string {
     filename := filepath.Base(path)
     dirname := filepath.Dir(path)
     
+    // Clean up directory path
     if dirname == "." {
         dirname = ""
     } else if strings.HasPrefix(dirname, "./") {
         dirname = dirname[2:]
     }
 
-    ext := strings.ToLower(filepath.Ext(filename))
-    icon := getFileIcon(ext)
+    // Get icon and color for the file
+    iconDef := iconMap.Get(filename)
 
-    var fileColor string
-    switch ext {
-    case ".go":
-        fileColor = Cyan
-    case ".py", ".pyc":
-        fileColor = Blue
-    case ".cpp", ".h":
-        fileColor = Green
-    case ".svelte":
-        fileColor = Red
-    default:
-        fileColor = Reset
-    }
-
+    // Directory always uses blue
     dirColor := Blue
 
+    // Format the output based on whether we have a directory component
     if dirname == "" {
-        return fmt.Sprintf("%s%s%s%s", 
-            icon,
-            fileColor, filename, Reset)
+        return fmt.Sprintf("%s %s%s%s", 
+            iconDef.Icon,
+            iconDef.Color, filename, Reset)
     }
 
-    return fmt.Sprintf("%s%s%-30s%s %s%s%s",
-        icon,
-        fileColor, filename, Reset,
+    return fmt.Sprintf("%s %s%-30s%s %s%s%s",
+        iconDef.Icon,
+        iconDef.Color, filename, Reset,
         dirColor, dirname, Reset)
+}
+
+// FormatPath returns a colored path based on its extension (legacy function)
+func FormatPath(path string) string {
+    if strings.HasPrefix(path, "./") {
+        path = path[2:]
+    }
+
+    iconDef := iconMap.Get(path)
+    return fmt.Sprintf("%s %s%s%s", iconDef.Icon, iconDef.Color, path, Reset)
+}
+
+// GetIcon is a helper function to get icon for a path
+func GetIcon(path string) string {
+    return iconMap.Get(path).Icon
+}
+
+// GetColor is a helper function to get color for a path
+func GetColor(path string) string {
+    return iconMap.Get(path).Color
+}
+
+// ColorizeFilename applies appropriate color to a filename
+func ColorizeFilename(filename string) string {
+    iconDef := iconMap.Get(filename)
+    return fmt.Sprintf("%s%s%s", iconDef.Color, filename, Reset)
+}
+
+// ColorizeDirectory applies directory color to a path
+func ColorizeDirectory(path string) string {
+    return fmt.Sprintf("%s%s%s", Blue, path, Reset)
+}
+
+// StripANSI removes ANSI escape sequences efficiently
+func StripANSI(s string) string {
+    var b strings.Builder
+    b.Grow(len(s))
+    inEscape := false
+
+    for i := 0; i < len(s); i++ {
+        if s[i] == '\x1b' {
+            inEscape = true
+            continue
+        }
+        if inEscape {
+            if (s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= 'a' && s[i] <= 'z') {
+                inEscape = false
+            }
+            continue
+        }
+        b.WriteByte(s[i])
+    }
+    return b.String()
 }
